@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables
+.env
+.env.*
+
+# Model weights (large files, downloaded at build time)
+pretrained_models/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
