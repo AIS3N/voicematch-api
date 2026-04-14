@@ -97,6 +97,23 @@ Results are sorted by score descending (best match first).
 
 ## Running locally
 
+### 1. Create an Upstash Redis database
+
+1. Go to [upstash.com](https://upstash.com) and create a free account
+2. Create a new Redis database
+3. In the database dashboard, go to **REST API** and copy the **URL** and **Token**
+
+### 2. Configure environment variables
+
+Create a `.env` file at the project root:
+
+```env
+UPSTASH_REDIS_REST_URL=your_upstash_url
+UPSTASH_REDIS_REST_TOKEN=your_upstash_token
+```
+
+### 3. Run the API
+
 ```bash
 pyenv local 3.12.9
 python -m venv venv
