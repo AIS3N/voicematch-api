@@ -1,8 +1,9 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Request
 from pydantic import BaseModel
 
 from core.audio import preprocess_audio
 from core.model import extract_embedding
+from core.ratelimit import check_rate_limit
 
 router = APIRouter()
 
@@ -13,7 +14,7 @@ class EmbedResponse(BaseModel):
 
 
 @router.post("/embed", response_model=EmbedResponse)
-async def embed(file: UploadFile = File(...)):
+async def embed(request: Request, file: UploadFile = File(...)):
     """
     Extract a voice embedding from an audio file.
 
@@ -22,6 +23,10 @@ async def embed(file: UploadFile = File(...)):
     Returns a 192-dimensional L2-normalized embedding vector and the duration
     of clean speech detected (in seconds).
     """
+    forwarded_for = request.headers.get("x-forwarded-for")
+    ip = forwarded_for.split(",")[0].strip() if forwarded_for else request.client.host
+    await check_rate_limit(ip)
+
     file_bytes = await file.read()
     audio, duration = preprocess_audio(file_bytes)
     embedding = extract_embedding(audio)
