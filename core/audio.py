@@ -1,6 +1,8 @@
 import io
 import subprocess
+import base64
 import numpy as np
+import soundfile as sf
 import librosa
 import noisereduce as nr
 from fastapi import HTTPException
@@ -33,10 +35,11 @@ def _to_wav(file_bytes: bytes) -> bytes:
     return result.stdout
 
 
-def preprocess_audio(file_bytes: bytes) -> tuple[np.ndarray, float]:
+def preprocess_audio(file_bytes: bytes, denoise: bool = False) -> tuple[np.ndarray, float, str]:
     """
-    Convert audio to mono 16kHz, denoise, strip silence, normalize amplitude.
-    Returns (audio_array, duration_seconds).
+    Convert audio to mono 16kHz, strip silence, normalize amplitude.
+    If denoise=True, applies noise reduction before silence stripping (may affect similarity accuracy).
+    Returns (audio_array, duration_seconds, processed_audio_b64).
     Raises HTTPException 400 if audio is invalid or too short after cleaning.
     """
     if len(file_bytes) > MAX_FILE_BYTES:
@@ -53,8 +56,8 @@ def preprocess_audio(file_bytes: bytes) -> tuple[np.ndarray, float]:
     if len(audio) / TARGET_SR > MAX_DURATION_SECONDS:
         raise HTTPException(status_code=400, detail="Audio exceeds 5-minute limit.")
 
-    # Noise reduction
-    audio = nr.reduce_noise(y=audio, sr=TARGET_SR)
+    if denoise:
+        audio = nr.reduce_noise(y=audio, sr=TARGET_SR, prop_decrease=0.5)
 
     # Voice activity detection — strip silent segments
     audio = _strip_silence(audio)
@@ -64,7 +67,7 @@ def preprocess_audio(file_bytes: bytes) -> tuple[np.ndarray, float]:
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Only {duration:.1f}s of speech detected after noise removal "
+                f"Only {duration:.1f}s of speech detected after cleaning "
                 f"(minimum: {MIN_CLEAN_SECONDS}s). Record in a quieter environment."
             ),
         )
@@ -74,10 +77,14 @@ def preprocess_audio(file_bytes: bytes) -> tuple[np.ndarray, float]:
     if peak > 0:
         audio = audio / peak * 0.95
 
-    return audio, duration
+    buf = io.BytesIO()
+    sf.write(buf, audio, TARGET_SR, format="WAV", subtype="PCM_16")
+    processed_audio_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    return audio, duration, processed_audio_b64
 
 
-def _strip_silence(audio: np.ndarray, top_db: float = 30.0) -> np.ndarray:
+def _strip_silence(audio: np.ndarray, top_db: float = 40.0) -> np.ndarray:
     """Remove silent frames using energy-based VAD."""
     intervals = librosa.effects.split(audio, top_db=top_db)
     if len(intervals) == 0:
