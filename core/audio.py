@@ -1,8 +1,6 @@
 import io
 import subprocess
-import base64
 import numpy as np
-import soundfile as sf
 import librosa
 import noisereduce as nr
 from fastapi import HTTPException
@@ -15,11 +13,14 @@ MAX_DURATION_SECONDS = 300  # 5 minutes — reject before loading
 
 
 def _to_wav(file_bytes: bytes) -> bytes:
-    """Convert any ffmpeg-supported format to 16kHz mono WAV via stdin/stdout."""
+    """Convert any ffmpeg-supported format to 16kHz mono WAV via stdin/stdout.
+    Truncates to MAX_CLEAN_SECONDS at decode time to cap memory usage.
+    """
     result = subprocess.run(
         [
             "ffmpeg", "-y",
             "-i", "pipe:0",
+            "-t", str(int(MAX_CLEAN_SECONDS)),
             "-ar", str(TARGET_SR),
             "-ac", "1",
             "-f", "wav",
@@ -36,11 +37,11 @@ def _to_wav(file_bytes: bytes) -> bytes:
     return result.stdout
 
 
-def preprocess_audio(file_bytes: bytes, denoise: bool = False) -> tuple[np.ndarray, float, str]:
+def preprocess_audio(file_bytes: bytes, denoise: bool = False) -> tuple[np.ndarray, float]:
     """
     Convert audio to mono 16kHz, strip silence, normalize amplitude.
     If denoise=True, applies noise reduction before silence stripping (may affect similarity accuracy).
-    Returns (audio_array, duration_seconds, processed_audio_b64).
+    Returns (audio_array, duration_seconds).
     Raises HTTPException 400 if audio is invalid or too short after cleaning.
     """
     if len(file_bytes) > MAX_FILE_BYTES:
@@ -56,11 +57,6 @@ def preprocess_audio(file_bytes: bytes, denoise: bool = False) -> tuple[np.ndarr
 
     if len(audio) / TARGET_SR > MAX_DURATION_SECONDS:
         raise HTTPException(status_code=400, detail="Audio exceeds 5-minute limit.")
-
-    # Truncate early to cap memory usage — speaker identity is captured in the first 30s
-    max_samples = int(MAX_CLEAN_SECONDS * TARGET_SR)
-    if len(audio) > max_samples:
-        audio = audio[:max_samples]
 
     if denoise:
         audio = nr.reduce_noise(y=audio, sr=TARGET_SR, prop_decrease=0.5)
@@ -83,11 +79,7 @@ def preprocess_audio(file_bytes: bytes, denoise: bool = False) -> tuple[np.ndarr
     if peak > 0:
         audio = audio / peak * 0.95
 
-    buf = io.BytesIO()
-    sf.write(buf, audio, TARGET_SR, format="WAV", subtype="PCM_16")
-    processed_audio_b64 = base64.b64encode(buf.getvalue()).decode()
-
-    return audio, duration, processed_audio_b64
+    return audio, duration
 
 
 def _strip_silence(audio: np.ndarray, top_db: float = 40.0) -> np.ndarray:

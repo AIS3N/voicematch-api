@@ -11,7 +11,6 @@ router = APIRouter()
 class EmbedResponse(BaseModel):
     embedding: list[float]
     duration: float
-    processed_audio: str
     denoise_applied: bool
 
 
@@ -28,20 +27,18 @@ async def embed(
     - **denoise**: Apply noise reduction before processing (default: false).
       Warning: may affect similarity accuracy on clean recordings.
 
-    Returns a 192-dimensional L2-normalized embedding vector, the duration
-    of clean speech detected (in seconds), and the processed audio as a base64
-    WAV string (use as `data:audio/wav;base64,<processed_audio>`).
+    Returns a 192-dimensional L2-normalized embedding vector and the duration
+    of clean speech detected (in seconds).
     """
     forwarded_for = request.headers.get("x-forwarded-for")
     ip = forwarded_for.split(",")[0].strip() if forwarded_for else request.client.host
     await check_rate_limit(ip)
 
     file_bytes = await file.read()
-    audio, duration, processed_audio_b64 = preprocess_audio(file_bytes, denoise=denoise)
+    audio, duration = preprocess_audio(file_bytes, denoise=denoise)
     embedding = extract_embedding(audio)
     return EmbedResponse(
         embedding=embedding.tolist(),
         duration=round(duration, 2),
-        processed_audio=processed_audio_b64,
         denoise_applied=denoise,
     )
