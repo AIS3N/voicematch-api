@@ -36,7 +36,9 @@ async def embed(
 
     file_bytes = await file.read()
     audio, duration = preprocess_audio(file_bytes, denoise=denoise)
+    del file_bytes
     embedding = extract_embedding(audio)
+    del audio
     return EmbedResponse(
         embedding=embedding.tolist(),
         duration=round(duration, 2),
