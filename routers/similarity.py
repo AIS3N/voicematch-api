@@ -7,15 +7,20 @@ from core.model import cosine_similarity
 router = APIRouter()
 
 
+EMBEDDING_DIM = 192
+
+
 class SimilarityRequest(BaseModel):
     a: list[float]
     b: list[float]
 
     @field_validator("a", "b")
     @classmethod
-    def must_be_non_empty(cls, v):
+    def must_be_valid_embedding(cls, v):
         if len(v) == 0:
             raise ValueError("Embedding must not be empty.")
+        if len(v) != EMBEDDING_DIM:
+            raise ValueError(f"Embedding must be {EMBEDDING_DIM}-dimensional, got {len(v)}.")
         return v
 
 

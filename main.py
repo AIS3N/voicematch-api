@@ -1,19 +1,28 @@
+import logging
+import time
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import embed, similarity, match
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+logger = logging.getLogger("voicematch")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Warm up model at startup so first request isn't slow
     from core.model import get_model
+    logger.info("Loading model...")
     get_model()
+    logger.info("Model loaded.")
     yield
 
 
@@ -34,6 +43,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration = round((time.perf_counter() - start) * 1000)
+    forwarded_for = request.headers.get("x-forwarded-for")
+    ip = forwarded_for.split(",")[0].strip() if forwarded_for else (request.client.host if request.client else "unknown")
+    logger.info("%s %s %s %dms %s", request.method, request.url.path, response.status_code, duration, ip)
+    return response
+
+
 app.include_router(embed.router, tags=["Embedding"])
 app.include_router(similarity.router, tags=["Similarity"])
 app.include_router(match.router, tags=["Matching"])
@@ -41,4 +62,8 @@ app.include_router(match.router, tags=["Matching"])
 
 @app.get("/health", tags=["Health"])
 def health():
-    return {"status": "ok"}
+    from core.model import _model
+    return {
+        "status": "ok",
+        "model": "loaded" if _model is not None else "not_loaded",
+    }

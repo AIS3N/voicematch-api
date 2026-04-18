@@ -2,18 +2,22 @@ import os
 import httpx
 from fastapi import HTTPException
 
-UPSTASH_REDIS_REST_URL = os.environ["UPSTASH_REDIS_REST_URL"]
-UPSTASH_REDIS_REST_TOKEN = os.environ["UPSTASH_REDIS_REST_TOKEN"]
-
 RATE_LIMIT = 3
 
 
-async def check_rate_limit(ip: str) -> None:
-    headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"}
+async def check_rate_limit(ip: str) -> int:
+    """
+    Increment the request counter for the given IP.
+    Raises 429 if the limit is exceeded.
+    Returns the number of remaining requests for today.
+    """
+    url = os.environ["UPSTASH_REDIS_REST_URL"]
+    token = os.environ["UPSTASH_REDIS_REST_TOKEN"]
+    headers = {"Authorization": f"Bearer {token}"}
 
     async with httpx.AsyncClient() as client:
         incr_res = await client.post(
-            f"{UPSTASH_REDIS_REST_URL}/incr/rl:{ip}",
+            f"{url}/incr/rl:{ip}",
             headers=headers,
         )
         incr_res.raise_for_status()
@@ -21,9 +25,11 @@ async def check_rate_limit(ip: str) -> None:
 
         if count == 1:
             await client.post(
-                f"{UPSTASH_REDIS_REST_URL}/expire/rl:{ip}/86400",
+                f"{url}/expire/rl:{ip}/86400",
                 headers=headers,
             )
 
     if count > RATE_LIMIT:
         raise HTTPException(status_code=429, detail="rate_limit_exceeded")
+
+    return max(0, RATE_LIMIT - count)
