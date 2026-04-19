@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import embed, similarity, match
@@ -61,9 +61,9 @@ app.include_router(match.router, tags=["Matching"])
 
 
 @app.get("/health", tags=["Health"])
-def health():
+def health(response: Response):
     from core.model import _model
-    return {
-        "status": "ok",
-        "model": "loaded" if _model is not None else "not_loaded",
-    }
+    if _model is None:
+        response.status_code = 503
+        return {"status": "starting", "model": "not_loaded"}
+    return {"status": "ok", "model": "loaded"}
