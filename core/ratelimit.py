@@ -1,35 +1,17 @@
-import os
-import httpx
+from collections import defaultdict
 from fastapi import HTTPException
 
-RATE_LIMIT = 3
+# High fallback limit to protect against direct API abuse bypassing the frontend
+RATE_LIMIT = 20
+_counts: dict[str, int] = defaultdict(int)
 
 
-async def check_rate_limit(ip: str) -> int:
+async def check_rate_limit(ip: str) -> None:
     """
-    Increment the request counter for the given IP.
-    Raises 429 if the limit is exceeded.
-    Returns the number of remaining requests for today.
+    Simple in-memory fallback rate limit.
+    Primary rate limiting is handled by the Next.js frontend via Upstash Redis.
+    This protects against direct API abuse only.
     """
-    url = os.environ["UPSTASH_REDIS_REST_URL"]
-    token = os.environ["UPSTASH_REDIS_REST_TOKEN"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    async with httpx.AsyncClient() as client:
-        incr_res = await client.post(
-            f"{url}/incr/rl:{ip}",
-            headers=headers,
-        )
-        incr_res.raise_for_status()
-        count = incr_res.json()["result"]
-
-        if count == 1:
-            await client.post(
-                f"{url}/expire/rl:{ip}/86400",
-                headers=headers,
-            )
-
-    if count > RATE_LIMIT:
+    _counts[ip] += 1
+    if _counts[ip] > RATE_LIMIT:
         raise HTTPException(status_code=429, detail="rate_limit_exceeded")
-
-    return max(0, RATE_LIMIT - count)

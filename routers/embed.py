@@ -12,7 +12,6 @@ class EmbedResponse(BaseModel):
     embedding: list[float]
     duration: float
     denoise_applied: bool
-    requests_remaining: int
 
 
 @router.post("/embed", response_model=EmbedResponse)
@@ -33,7 +32,7 @@ async def embed(
     """
     forwarded_for = request.headers.get("x-forwarded-for")
     ip = forwarded_for.split(",")[0].strip() if forwarded_for else request.client.host
-    requests_remaining = await check_rate_limit(ip)
+    await check_rate_limit(ip)
 
     file_bytes = await file.read()
     audio, duration = preprocess_audio(file_bytes, denoise=denoise)
@@ -44,5 +43,4 @@ async def embed(
         embedding=embedding.tolist(),
         duration=round(duration, 2),
         denoise_applied=denoise,
-        requests_remaining=requests_remaining,
     )
