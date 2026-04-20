@@ -1,15 +1,14 @@
 from collections import defaultdict
 from fastapi import HTTPException
 
-# High fallback limit to protect against direct API abuse bypassing the frontend
-RATE_LIMIT = 20
+# High fallback limit to protect against direct API abuse
+RATE_LIMIT = 200
 _counts: dict[str, int] = defaultdict(int)
 
 
 async def check_rate_limit(ip: str) -> None:
     """
     Simple in-memory fallback rate limit.
-    Primary rate limiting is handled by the Next.js frontend via Upstash Redis.
     This protects against direct API abuse only.
     """
     _counts[ip] += 1
