@@ -2,7 +2,7 @@ from collections import defaultdict
 from fastapi import HTTPException
 
 # High fallback limit to protect against direct API abuse
-RATE_LIMIT = 200
+RATE_LIMIT = 20000000
 _counts: dict[str, int] = defaultdict(int)
 
 

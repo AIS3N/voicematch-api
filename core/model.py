@@ -45,7 +45,6 @@ def extract_embedding(audio: np.ndarray) -> np.ndarray:
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     """
     Cosine similarity between two L2-normalized vectors.
-    Returned value mapped from [-1, 1] to [0, 1] for intuitives scores.
+    Returns a value between -1 and 1.
     """
-    raw = float(np.dot(a, b))
-    return round((raw + 1) / 2, 4)
+    return round(float(np.dot(a, b)), 4)

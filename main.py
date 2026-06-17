@@ -2,10 +2,14 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
+from core.auth import require_api_key
 from routers import embed, similarity, match
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,9 +56,9 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-app.include_router(embed.router, tags=["Embedding"])
-app.include_router(similarity.router, tags=["Similarity"])
-app.include_router(match.router, tags=["Matching"])
+app.include_router(embed.router, tags=["Embedding"], dependencies=[Depends(require_api_key)])
+app.include_router(similarity.router, tags=["Similarity"], dependencies=[Depends(require_api_key)])
+app.include_router(match.router, tags=["Matching"], dependencies=[Depends(require_api_key)])
 
 
 @app.get("/health", tags=["Health"])
