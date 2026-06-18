@@ -9,7 +9,6 @@ TARGET_SR = 16000
 MIN_CLEAN_SECONDS = 3.0
 MAX_CLEAN_SECONDS = 30.0  # truncate after silence stripping — model gains nothing beyond this
 MAX_FILE_BYTES = 10 * 1024 * 1024  # 10MB
-MAX_DURATION_SECONDS = 300  # 5 minutes — reject before loading
 
 
 def _to_wav(file_bytes: bytes) -> bytes:
@@ -54,9 +53,6 @@ def preprocess_audio(file_bytes: bytes, denoise: bool = False) -> tuple[np.ndarr
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not decode audio: {e}")
-
-    if len(audio) / TARGET_SR > MAX_DURATION_SECONDS:
-        raise HTTPException(status_code=400, detail="Audio exceeds 5-minute limit.")
 
     if denoise:
         audio = nr.reduce_noise(y=audio, sr=TARGET_SR, prop_decrease=0.5)
