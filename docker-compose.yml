@@ -1,0 +1,24 @@
+services:
+  api:
+    build: .
+    container_name: voicematch-api
+    restart: unless-stopped
+    # Key (and any other vars) come from .env beside this file — never committed.
+    env_file:
+      - .env
+    # Bind to localhost only: nginx (on the host) proxies to 127.0.0.1:8001.
+    # The container's internal port stays 8000 (the Dockerfile CMD).
+    ports:
+      - "127.0.0.1:8001:8000"
+    # Cache the downloaded model weights across recreates.
+    volumes:
+      - models:/app/pretrained_models
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s   # grace while the model loads on first boot
+
+volumes:
+  models:
